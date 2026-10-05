@@ -179,6 +179,7 @@
           <div>
             <p class="text-small text-muted">hosting</p>
             <p id="meetup-host" class="text-heading font-semibold text-fg mt-1"></p>
+            <p id="meetup-place" class="text-small text-muted"></p>
           </div>
           <div class="text-right">
             <p id="meetup-date" class="text-small text-muted"></p>
@@ -279,6 +280,7 @@
         readTitle: $('read-title'), readAuthor: $('read-author'), readDue: $('read-due'),
         meetupLoading: $('meetup-loading'), meetupData: $('meetup-data'),
         meetupHost: $('meetup-host'), meetupDate: $('meetup-date'),
+        meetupPlace: $('meetup-place'),
         meetupBar: $('meetup-bar'), meetupCount: $('meetup-count'),
         sugLoading: $('sug-loading'), sugList: $('sug-list'), sugEmpty: $('sug-empty'),
         brLoading: $('br-loading'), brList: $('br-list'), brEmpty: $('br-empty'),
@@ -374,6 +376,9 @@
         }
         setMeetup('data');
         els.meetupHost.textContent = club.meetup.host || 'to be decided';
+        els.meetupPlace.textContent = club.meetup.host
+          ? 'at ' + club.meetup.host + "'s place"
+          : 'Place to be decided';
         els.meetupDate.textContent = longDate(club.meetup.at);
         updateCountdown();
         renderSuggestions();
