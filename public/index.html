@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+
   <script>
   // usernode-dev-console@1
   (function () {
@@ -64,7 +64,7 @@
   })();
   </script>
   <title>Page Turners</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%237c3aed'/><circle cx='50' cy='50' r='18' fill='white'/></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%23f59e0b'/><circle cx='50' cy='50' r='18' fill='white'/></svg>">
   <!-- Tailwind, PRECOMPILED for this app (was cdn.tailwindcss.com's
        in-browser engine plus an inline tailwind.config here). The config
        moved to tailwind.config.js in the repo root; npm run build compiles
@@ -108,199 +108,399 @@
   </script>
 </head>
 <body class="min-h-screen bg-ground text-fg">
-  <!-- Built from the design kit in styles/tailwind-input.css: colour tokens
-       (bg-ground, text-muted, bg-accent, ...) that are right in both looks,
-       and components (btn-primary, list, card, state-empty, ...). The real
-       app keeps the kit; CLAUDE.md's "## Design" says how. -->
+  <!-- Built from the design kit in styles/tailwind-input.css, laid out as
+       design/sketch.html drew it: header, this month's read, next meetup
+       (with the countdown, the app's signature element), suggestions, and
+       the full-width Suggest a book button. One GET /api/club drives the
+       screen; the script at the bottom switches its states. -->
   <main class="mx-auto flex max-w-md flex-col gap-8 px-4 py-10">
 
-    <!-- usernode-starter-notice@1 — starter-template messaging. When building
-         the user's real app, replace this whole screen and delete this block,
-         both sentinel comments included. -->
-    <div class="flex flex-col items-start gap-2">
-      <p class="rounded-full bg-raised px-3 py-1 text-small font-medium text-muted">A sketch of Page Turners</p>
-      <p class="text-small text-muted">Homeroom sketched this from the app's description. Nothing on it works yet: to build it, ask Homeroom bot (tap the <strong class="font-semibold text-fg">Homeroom icon</strong>, then <strong class="font-semibold text-fg">Ask for a change</strong>).</p>
-    </div>
     <header class="px-4 py-6 border-b border-line">
-  <h1 class="text-title font-bold text-fg">Page Turners</h1>
-  <p class="text-small text-muted mt-1">Your book club</p>
-</header>
+      <h1 class="text-title font-bold text-fg">Page Turners</h1>
+      <p class="text-small text-muted mt-1">Your book club</p>
+    </header>
 
-<section class="px-4 py-6">
-  <p class="section-label text-muted font-medium mb-3">This month's read</p>
-  <div class="card bg-raised rounded-lg p-4 border border-line">
-    <div class="flex gap-4">
-      <div class="bg-accent/10 rounded-md w-16 shrink-0"></div>
-      <div class="flex flex-col grow min-w-0">
-        <h2 class="text-heading font-semibold text-fg">The Midnight Library</h2>
-        <p class="text-body text-muted mt-1">Matt Haig</p>
-        <p class="text-small text-muted mt-3">Due: 31 Oct</p>
-      </div>
-    </div>
-  </div>
-</section>
+    <!-- The load failed: what failed, what still works, and a way back.
+         The three sections below are hidden while this shows. -->
+    <section id="screen-error" class="state-error" hidden>
+      <p class="text-heading">Couldn't load the club details</p>
+      <p class="text-body text-muted">This month's read, the meetup and the suggestions didn't load. Suggesting a book still works once the page is up.</p>
+      <button id="retry-btn" class="btn-secondary">Retry</button>
+    </section>
 
-<section class="px-4 py-6 border-t border-line">
-  <p class="section-label text-muted font-medium mb-3">Next meetup</p>
-  <div class="card bg-raised rounded-lg p-4 border border-line">
-    <div class="flex items-start justify-between mb-4">
-      <div>
-        <p class="text-small text-muted">hosting</p>
-        <p class="text-heading font-semibold text-fg mt-1">Member 2</p>
-      </div>
-      <div class="text-right">
-        <p class="text-small text-muted">thursday, 31 october</p>
-        <p class="text-heading font-semibold text-fg mt-1">7:00 pm</p>
-      </div>
-    </div>
-    <div class="bg-line rounded-full h-2 mt-4">
-      <div class="bg-accent rounded-full h-2 w-3/4"></div>
-    </div>
-    <p class="text-small text-accent font-semibold mt-2">26 days to go</p>
-  </div>
-</section>
-
-<section class="px-4 py-6 border-t border-line">
-  <p class="section-label text-muted font-medium mb-3">Suggestions</p>
-  <div class="list">
-    <div class="list-row bg-raised rounded-lg p-4 border border-line">
-      <div class="flex items-baseline justify-between">
-        <div class="grow">
-          <p class="text-body font-medium text-fg">Piranesi</p>
-          <p class="text-small text-muted mt-1">Suggested by You</p>
-        </div>
-      </div>
-    </div>
-    <div class="list-row bg-raised rounded-lg p-4 border border-line mt-2">
-      <div class="flex items-baseline justify-between">
-        <div class="grow">
-          <p class="text-body font-medium text-fg">Circe</p>
-          <p class="text-small text-muted mt-1">Suggested by Member 3</p>
-        </div>
-      </div>
-    </div>
-    <div class="list-row bg-raised rounded-lg p-4 border border-line mt-2">
-      <div class="flex items-baseline justify-between">
-        <div class="grow">
-          <p class="text-body font-medium text-fg">Project Hail Mary</p>
-          <p class="text-small text-muted mt-1">Suggested by Member 1</p>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="px-4 py-6 border-t border-line">
-  <button class="btn-primary w-full">Suggest a book</button>
-</section>
-    <!-- /usernode-starter-notice@1 -->
-
-    <section class="flex flex-col items-center gap-5" hidden>
-      <div class="w-full px-1">
-        <h2 class="text-heading">Try the example</h2>
-        <p class="text-small text-muted">This example will be replaced</p>
-      </div>
-
-      <button id="press-btn" class="btn-primary h-32 w-32 rounded-full text-title active:scale-95">Press!</button>
-
-      <p id="count" class="min-h-6 text-body text-muted"></p>
-
-      <div class="w-full">
-        <h3 class="section-label">Leaderboard</h3>
-        <!-- Anything that loads data shows exactly one of these at a time:
-             loading, the data, empty (it loaded, and there is nothing yet)
-             or error (it did not load). The script below switches them. -->
-        <div id="leaderboard-loading" role="status">
-          <span class="sr-only">Loading the leaderboard</span>
-          <div class="list">
-            <div class="list-row"><div class="skeleton h-4 w-1/2"></div></div>
-            <div class="list-row"><div class="skeleton h-4 w-1/3"></div></div>
-            <div class="list-row"><div class="skeleton h-4 w-2/5"></div></div>
+    <section id="sec-read" class="px-4 py-6">
+      <p class="section-label text-muted font-medium mb-3">This month's read</p>
+      <div id="read-loading" class="card bg-raised rounded-lg p-4 border border-line" role="status">
+        <span class="sr-only">Loading this month's read</span>
+        <div class="flex gap-4">
+          <div class="skeleton w-16 h-20 shrink-0"></div>
+          <div class="flex flex-col gap-2 grow min-w-0 pt-1">
+            <div class="skeleton h-4 w-2/3"></div>
+            <div class="skeleton h-4 w-1/3"></div>
+            <div class="skeleton h-3 w-1/4 mt-2"></div>
           </div>
         </div>
-        <ol id="leaderboard" class="list" hidden></ol>
-        <div id="leaderboard-empty" class="state-empty" hidden>
-          <p class="text-heading">No presses yet</p>
-          <p class="text-body text-muted">Press the button to put your name on the board.</p>
-          <button id="leaderboard-press" class="btn-secondary">Press it</button>
+      </div>
+      <div id="read-data" class="card bg-raised rounded-lg p-4 border border-line" hidden>
+        <div class="flex gap-4">
+          <div class="bg-accent/10 rounded-md w-16 shrink-0" aria-hidden="true"></div>
+          <div class="flex flex-col grow min-w-0">
+            <h2 id="read-title" class="text-heading font-semibold text-fg"></h2>
+            <p id="read-author" class="text-body text-muted mt-1"></p>
+            <p id="read-due" class="text-small text-muted mt-3"></p>
+          </div>
         </div>
-        <div id="leaderboard-error" class="state-error" hidden>
-          <svg class="h-6 w-6 text-danger" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
-          <p class="text-heading">Couldn't load the leaderboard</p>
-          <p class="text-body text-muted">Pressing still works, and every press is saved.</p>
-          <button id="leaderboard-retry" class="btn-secondary">Retry</button>
-        </div>
+      </div>
+      <div id="read-empty" class="state-empty" hidden>
+        <p class="text-heading">No book picked yet</p>
+        <p class="text-body text-muted">Pick one from the suggestions below.</p>
       </div>
     </section>
 
-    <p class="text-center text-small text-muted" hidden>Built on Homeroom. This template screen disappears once you build your real app.</p>
+    <section id="sec-meetup" class="px-4 py-6 border-t border-line">
+      <p class="section-label text-muted font-medium mb-3">Next meetup</p>
+      <div id="meetup-loading" class="card bg-raised rounded-lg p-4 border border-line" role="status">
+        <span class="sr-only">Loading the next meetup</span>
+        <div class="flex items-start justify-between mb-4">
+          <div class="flex flex-col gap-2">
+            <div class="skeleton h-3 w-16"></div>
+            <div class="skeleton h-4 w-24"></div>
+          </div>
+          <div class="flex flex-col items-end gap-2">
+            <div class="skeleton h-3 w-28"></div>
+            <div class="skeleton h-4 w-16"></div>
+          </div>
+        </div>
+        <div class="skeleton h-2 w-full mt-4"></div>
+        <div class="skeleton h-3 w-24 mt-2"></div>
+      </div>
+      <div id="meetup-data" class="card bg-raised rounded-lg p-4 border border-line" hidden>
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <p class="text-small text-muted">hosting</p>
+            <p id="meetup-host" class="text-heading font-semibold text-fg mt-1"></p>
+          </div>
+          <div class="text-right">
+            <p id="meetup-date" class="text-small text-muted"></p>
+            <p class="text-heading font-semibold text-fg mt-1">7:00 pm</p>
+          </div>
+        </div>
+        <div class="bg-line rounded-full h-2 mt-4" role="progressbar" aria-label="How far through the month the meetup is">
+          <div id="meetup-bar" class="bg-accent rounded-full h-2" style="width:0%"></div>
+        </div>
+        <p id="meetup-count" class="text-small text-accent font-semibold mt-2"></p>
+      </div>
+    </section>
+
+    <section id="sec-suggestions" class="px-4 py-6 border-t border-line">
+      <p class="section-label text-muted font-medium mb-3">Suggestions</p>
+      <div id="sug-loading" class="list" role="status">
+        <span class="sr-only">Loading suggestions</span>
+        <div class="list-row"><div class="skeleton h-4 w-1/2"></div></div>
+        <div class="list-row"><div class="skeleton h-4 w-2/5"></div></div>
+        <div class="list-row"><div class="skeleton h-4 w-1/3"></div></div>
+      </div>
+      <ul id="sug-list" class="list" hidden></ul>
+      <div id="sug-empty" class="state-empty" hidden>
+        <p class="text-heading">No suggestions yet</p>
+        <p class="text-body text-muted">Suggest the first book below.</p>
+      </div>
+    </section>
+
+    <section class="px-4 py-6 border-t border-line">
+      <!-- The small form the button opens, inline on the same screen. -->
+      <form id="suggest-form" class="flex flex-col gap-3" hidden>
+        <div>
+          <label for="suggest-title" class="text-small font-medium text-fg">Title</label>
+          <input id="suggest-title" class="field mt-1" maxlength="200" autocomplete="off">
+        </div>
+        <div>
+          <label for="suggest-author" class="text-small font-medium text-fg">Author (optional)</label>
+          <input id="suggest-author" class="field mt-1" maxlength="120" autocomplete="off">
+        </div>
+        <p id="suggest-error" class="text-small text-danger" hidden></p>
+        <div class="flex gap-2">
+          <button id="suggest-submit" type="submit" class="btn-primary grow">Suggest it</button>
+          <button id="suggest-cancel" type="button" class="btn-secondary">Cancel</button>
+        </div>
+      </form>
+      <button id="suggest-open" class="btn-primary w-full">Suggest a book</button>
+    </section>
   </main>
 
   <script>
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token') || '';
-    const headers = token ? { 'x-usernode-token': token } : {};
-    const count = document.getElementById('count');
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token') || '';
 
-    // The leaderboard's states, one shown at a time. Empty only when the
-    // load worked and found nothing; a failure is the error state, never
-    // "No presses yet".
-    const views = {
-      loading: document.getElementById('leaderboard-loading'),
-      list: document.getElementById('leaderboard'),
-      empty: document.getElementById('leaderboard-empty'),
-      error: document.getElementById('leaderboard-error'),
-    };
-    function show(state) {
-      for (const [name, el] of Object.entries(views)) el.hidden = name !== state;
-    }
-
-    async function loadLeaderboard() {
-      let leaderboard;
-      try {
-        const res = await fetch('/api/leaderboard', { headers });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        ({ leaderboard } = await res.json());
-      } catch {
-        show('error');
-        return;
+      // One fetch helper for the whole page: it forwards the platform token
+      // and, on a preview opened as of a moment, tells the server which
+      // moment that is (see "Time-dependent features" in the platform
+      // conventions).
+      function api(path, opts) {
+        opts = opts || {};
+        const headers = Object.assign({}, opts.headers);
+        if (token) headers['x-usernode-token'] = token;
+        if (window.usernode && window.usernode.previewNow && window.usernode.now) {
+          headers['x-usernode-now'] = window.usernode.now().toISOString();
+        }
+        return fetch(path, Object.assign({}, opts, { headers: headers }));
       }
-      // People's names go in as text, never as HTML.
-      views.list.replaceChildren(...leaderboard.map((r, i) => {
-        const row = document.createElement('li');
-        row.className = 'list-row justify-between';
-        const name = document.createElement('span');
-        name.textContent = (i + 1) + '. ' + r.username;
-        const presses = document.createElement('span');
-        presses.className = 'tabular-nums text-muted';
-        presses.textContent = r.presses;
-        row.append(name, presses);
-        return row;
-      }));
-      const total = leaderboard.reduce((s, r) => s + parseInt(r.presses, 10), 0);
-      count.textContent = total + (total === 1 ? ' press so far' : ' presses so far');
-      show(leaderboard.length ? 'list' : 'empty');
-    }
 
-    async function press() {
-      try {
-        const res = await fetch('/api/press', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...headers },
-        });
-        if (res.ok) loadLeaderboard();
-        else if (res.status === 401) count.textContent = 'Sign in to press!';
-      } catch {}
-    }
+      // "Now" through the bridge, so a preview shows its chosen moment;
+      // plain new Date() only where the bridge is absent (a bare local run).
+      function now() {
+        return window.usernode && window.usernode.now ? window.usernode.now() : new Date();
+      }
 
-    document.getElementById('press-btn').addEventListener('click', press);
-    document.getElementById('leaderboard-press').addEventListener('click', press);
-    document.getElementById('leaderboard-retry').addEventListener('click', () => {
-      show('loading');
-      loadLeaderboard();
-    });
+      const $ = (id) => document.getElementById(id);
+      const els = {
+        screenError: $('screen-error'), retry: $('retry-btn'),
+        secRead: $('sec-read'), secMeetup: $('sec-meetup'), secSug: $('sec-suggestions'),
+        readLoading: $('read-loading'), readData: $('read-data'), readEmpty: $('read-empty'),
+        readTitle: $('read-title'), readAuthor: $('read-author'), readDue: $('read-due'),
+        meetupLoading: $('meetup-loading'), meetupData: $('meetup-data'),
+        meetupHost: $('meetup-host'), meetupDate: $('meetup-date'),
+        meetupBar: $('meetup-bar'), meetupCount: $('meetup-count'),
+        sugLoading: $('sug-loading'), sugList: $('sug-list'), sugEmpty: $('sug-empty'),
+        form: $('suggest-form'), open: $('suggest-open'), cancel: $('suggest-cancel'),
+        title: $('suggest-title'), author: $('suggest-author'),
+        error: $('suggest-error'), submit: $('suggest-submit'),
+      };
 
-    loadLeaderboard();
+      // Dates are spelled the sketch's way, computed in UTC (see CLAUDE.md).
+      const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+      const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+      let club = null;
+
+      // The screen's three states. Loading shows skeletons where the data
+      // will be; data shows each section's content or its own empty state;
+      // error hides the sections and shows the one error block. The empty
+      // states never show while loading or after a failure.
+      function showScreen(state) {
+        els.screenError.hidden = state !== 'error';
+        const visible = state !== 'error';
+        els.secRead.hidden = !visible;
+        els.secMeetup.hidden = !visible;
+        els.secSug.hidden = !visible;
+        if (state === 'loading') {
+          setRead('loading'); setMeetup('loading'); setSug('loading');
+        }
+      }
+      function setRead(state) {
+        els.readLoading.hidden = state !== 'loading';
+        els.readData.hidden = state !== 'data';
+        els.readEmpty.hidden = state !== 'empty';
+      }
+      function setMeetup(state) {
+        els.meetupLoading.hidden = state !== 'loading';
+        els.meetupData.hidden = state !== 'data';
+      }
+      function setSug(state) {
+        els.sugLoading.hidden = state !== 'loading';
+        els.sugList.hidden = state !== 'list';
+        els.sugEmpty.hidden = state !== 'empty';
+      }
+
+      // "thursday, 31 october" — the sketch's spelling, from the date's own
+      // UTC calendar day.
+      function dateParts(atIso) {
+        return atIso.slice(0, 10).split('-').map(Number);
+      }
+      function longDate(atIso) {
+        const [y, m, d] = dateParts(atIso);
+        const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+        return WEEKDAYS[wd] + ', ' + d + ' ' + MONTHS[m - 1];
+      }
+      function shortDate(atIso) {
+        const [, m, d] = dateParts(atIso);
+        return d + ' ' + MONTHS_SHORT[m - 1];
+      }
+
+      // The countdown line and the bar, recomputed from the meetup date and
+      // the current moment (whole calendar days in UTC; on the day itself,
+      // "We meet tonight").
+      function updateCountdown() {
+        if (!club) return;
+        const atMs = new Date(club.meetup.at).getTime();
+        const nowMs = now().getTime();
+        const days = Math.max(0, Math.floor(atMs / 86400000) - Math.floor(nowMs / 86400000));
+        els.meetupCount.textContent =
+          days === 0 ? 'We meet tonight' : days === 1 ? '1 day to go' : days + ' days to go';
+        const at = new Date(atMs);
+        const start = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), 1);
+        const span = Math.max(1, atMs - start);
+        const frac = Math.min(1, Math.max(0, (nowMs - start) / span));
+        els.meetupBar.style.width = (frac * 100).toFixed(2) + '%';
+      }
+
+      function render() {
+        if (club.currentRead) {
+          setRead('data');
+          els.readTitle.textContent = club.currentRead.title;
+          els.readAuthor.textContent = club.currentRead.author || '';
+          els.readAuthor.hidden = !club.currentRead.author;
+          els.readDue.textContent = 'Due: ' + shortDate(club.meetup.at);
+        } else {
+          setRead('empty');
+        }
+        setMeetup('data');
+        els.meetupHost.textContent = club.meetup.host || 'to be decided';
+        els.meetupDate.textContent = longDate(club.meetup.at);
+        updateCountdown();
+        renderSuggestions();
+      }
+
+      function currentReadTag() {
+        const span = document.createElement('span');
+        span.className = 'rounded-full bg-accent/10 px-2 py-0.5 text-small font-medium text-fg';
+        span.textContent = "This month's read";
+        return span;
+      }
+
+      // Every name goes in as text, never as HTML.
+      function suggestionRow(s) {
+        const li = document.createElement('li');
+        li.className = 'list-row items-start';
+        const main = document.createElement('div');
+        main.className = 'grow min-w-0';
+        const titleLine = document.createElement('div');
+        titleLine.className = 'flex flex-wrap items-center gap-2';
+        const t = document.createElement('p');
+        t.className = 'text-body font-medium text-fg';
+        t.textContent = s.title;
+        titleLine.appendChild(t);
+        if (s.isCurrentRead) titleLine.appendChild(currentReadTag());
+        const by = document.createElement('p');
+        by.className = 'text-small text-muted mt-1';
+        by.textContent = 'Suggested by '
+          + (club.viewer && club.viewer === s.suggestedBy ? 'You' : s.suggestedBy);
+        main.appendChild(titleLine);
+        main.appendChild(by);
+        const set = document.createElement('button');
+        set.type = 'button';
+        set.className = 'btn-secondary text-small px-3 self-start';
+        set.textContent = 'Set';
+        set.addEventListener('click', () => setCurrent(s, set));
+        li.appendChild(main);
+        li.appendChild(set);
+        return li;
+      }
+
+      function renderSuggestions() {
+        const list = club.suggestions || [];
+        if (!list.length) {
+          setSug('empty');
+          return;
+        }
+        setSug('list');
+        els.sugList.replaceChildren(...list.map(suggestionRow));
+      }
+
+      // Choosing a suggestion makes it this month's read, here and in the
+      // read card. A 401 is account_required: the bridge shows the
+      // platform's "make an account" nudge, so guests get the same UI.
+      async function setCurrent(s, btn) {
+        btn.disabled = true;
+        try {
+          const res = await api('/api/current-read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ suggestionId: s.id }),
+          });
+          if (res.ok) {
+            club.currentRead = { id: s.id, title: s.title, author: s.author, suggestedBy: s.suggestedBy };
+            club.suggestions.forEach((x) => { x.isCurrentRead = x.id === s.id; });
+            render();
+            return;
+          }
+          if (res.status !== 401) btn.disabled = false;
+        } catch {
+          btn.disabled = false;
+        }
+      }
+
+      async function load() {
+        showScreen('loading');
+        try {
+          const res = await api('/api/club');
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          club = await res.json();
+        } catch {
+          club = null;
+          showScreen('error');
+          return;
+        }
+        showScreen('data');
+        render();
+      }
+
+      function openForm() {
+        els.open.hidden = true;
+        els.form.hidden = false;
+        els.error.hidden = true;
+        els.title.focus();
+      }
+      function closeForm() {
+        els.form.hidden = true;
+        els.open.hidden = false;
+        els.error.hidden = true;
+        els.title.value = '';
+        els.author.value = '';
+      }
+      els.open.addEventListener('click', openForm);
+      els.cancel.addEventListener('click', closeForm);
+      els.retry.addEventListener('click', load);
+
+
+      els.form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const title = els.title.value;
+        const author = els.author.value;
+        if (!title.trim()) {
+          els.error.textContent = 'A title is required.';
+          els.error.hidden = false;
+          return;
+        }
+        els.submit.disabled = true;
+        try {
+          const res = await api('/api/suggestions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: title, author: author }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (club) {
+              // The new suggestion goes on top of the list straight away.
+              club.suggestions.unshift(data.suggestion);
+              renderSuggestions();
+            }
+            closeForm();
+          } else if (res.status === 401) {
+            // account_required: the bridge shows the platform's nudge. The
+            // typed text stays where it is.
+          } else {
+            let msg = 'Could not save the suggestion. Try again.';
+            try {
+              const err = await res.json();
+              if (err && err.message) msg = err.message;
+            } catch {}
+            els.error.textContent = msg;
+            els.error.hidden = false;
+          }
+        } catch {
+          els.error.textContent = 'Could not save the suggestion. Try again.';
+          els.error.hidden = false;
+        }
+        els.submit.disabled = false;
+      });
+
+      setInterval(updateCountdown, 30000);
+      load();
+    })();
   </script>
 </body>
 </html>

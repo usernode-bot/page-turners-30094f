@@ -60,35 +60,11 @@ the platform fixes the base commit, and none of this applies.
 
 ## Starter template
 
-The screen this app currently ships — the hero, the "What's already
-working" card, and the Press! example (the demo markup in
-`public/index.html`, the `/api/press` and `/api/leaderboard` routes, and
-the `presses` table bootstrap in `server.js`) — is placeholder content
-from the Homeroom starter template, not product intent.
-
-When the user asks for their first real feature, REPLACE the template
-screen rather than building alongside it:
-
-- remove the `usernode-starter-notice@1` block in `public/index.html`
-  (both sentinel comments and everything between them),
-- remove or repurpose the "Try the example" card, its demo endpoints and
-  the `presses` table as appropriate,
-- rewrite `README.md` to describe the actual app.
-
-Keep the `usernode-dev-console@1` forwarder `<script>` when rewriting the
-HTML — that block is platform infrastructure, not template content. So is
-the bridge `<script>`. The design kit is not placeholder either: build the
-real app with it, and fill in "## Design" below.
-
-The screen has a light and a dark look and follows the viewer's Homeroom
-theme, switching live when they change it: the theme `<script>` right after
-the bridge tag sets a `dark` class on `<html>`. Keep that script, and give
-everything you build both looks (the design kit's colour tokens carry both), unless one
-fixed look is the point of this app, like a game's own scene; then say so
-under "## Design" below. Unless a request asks for one, add
-no theme picker: the viewer's Homeroom setting is the control. "The
-platform's light/dark theme inside the app frame" in the platform
-conventions has the details.
+The starter template's demo screen (the Press! button, the leaderboard and
+the `presses` table) was replaced by the real club screen in the app's
+first version, built from `design/sketch.html`. Nothing template-shaped is
+left; the platform infrastructure (the bridge, theme and dev-console
+scripts, the design kit) stays.
 
 If a rule below this line conflicts with the hosted conventions, the
 hosted conventions win. This file is **app-specific** — write down
@@ -100,24 +76,44 @@ tables you've marked private), etc.
 
 ## About Page Turners
 
-_(add a sentence or two of product context here so Claude Code has a
-shared understanding of what this app is for)_
+A small book club app. Its one screen answers three questions: what is the
+club reading this month, who is hosting the next meetup, and when is that
+meetup. The club meets on the last Thursday of every month at 7 pm (UTC).
+Anyone can suggest the next book; any signed-in member can set a
+suggestion as this month's read. There is no voting in this version: the
+suggestions list is the record, and picking is the decision.
 
 ## Design
 
-This app's look. The first real version fills in the blanks; every later
-change follows it, and updates it when a request changes the look on purpose.
+This app's look, from the sketch the creator was shown (`design/sketch.html`,
+with `design/sketch.json` describing its job, layout and words). Every
+later change follows it, and updates it when a request changes the look on
+purpose.
 
 - **Sketch:** `design/sketch.html` is the sketch this app's creator was shown
   when they made it, and `design/sketch.json` says its job, layout and words.
   The first version keeps them; list any change under Assumptions.
 
-- **Palette:** accent: amber, from the sketch (already set in the kit's tokens); neutrals: the kit's warm greys
+- **Palette:** accent: amber, from the sketch; neutrals: the kit's warm greys
 - **Signature element:** A countdown to the monthly meetup, phrased as the club would say it
 - **Type scale:** `text-title`, `text-heading`, `text-body`, `text-small`
   _(change their sizes in `tailwind.config.js` if you must, not their number)_
-- **One fixed look:** _(only for an app drawn as its own scene, such as a
-  game: which look, and why. Otherwise delete this line.)_
+
+Concretely:
+
+- **Accent:** the sketch's amber. The kit's `--accent` token carries it:
+  `149 96 7` in the light look (a deep amber, so white `on-accent` text
+  stays at 4.5:1) and `251 191 36` in the dark (with dark `on-accent`
+  text). Both are the sketch's amber, adjusted only for contrast.
+- **Signature element:** the meetup countdown: a progress bar that fills
+  across the month, with the days remaining under it ("16 days to go"; on
+  the day itself, "We meet tonight").
+- **Words:** "This month's read", "hosting", "Next meetup", "Suggestions",
+  "Suggest a book" / "Suggest it" (the form's submit button). Keep these
+  exact spellings.
+- Both looks are kept and follow the viewer's Homeroom theme (the theme
+  `<script>` after the bridge tag sets a `dark` class on `<html>`); there
+  is no theme picker and no fixed look.
 
 The kit is in `styles/tailwind-input.css`: colour tokens with a light and
 a dark value (named in `tailwind.config.js`), and a few components
@@ -139,6 +135,28 @@ Re-theme by changing the token values there, keeping every text pair at
 
 ## App-specific conventions
 
-_(optional — e.g. "all currency values stored as integer cents, not
-floats"; "the `posts` table is append-only"; "avoid adding new
-dependencies"; etc.)_
+- **All meetup maths is in UTC** (the server's own zone): the last
+  Thursday of the month at 19:00 UTC. If the group is somewhere else,
+  change `nextMeetup`/`lastThursdayAt19` in `server.js` and the date
+  rendering in `public/index.html` together, and update this line.
+- **Read "now" through the platform**: `req.now` on the server (set by the
+  `requestNow` middleware) and `usernode.now()` in the page, never
+  `new Date()` or SQL's `NOW()`, wherever the moment decides what shows,
+  so a staging preview can be shown as of a chosen moment.
+- **`suggestions` is append-only in v1**: no editing, deleting or voting.
+  `POST /api/current-read` (setting the month's read) is the decision.
+- **Host rotation is a lazy read-time advance**: the single `club_state`
+  row stores the host and the meetup they anchor; when `GET /api/club`
+  finds that meetup in the past, it rotates the host one place per missed
+  meetup through the platform's member list (creator first, wrapping) and
+  stores the new host and meetup. With a roster but no stored host, the
+  member after the creator hosts first (the creator's v1 choice was
+  priya_t1006); with no roster at all, the stored host stands and a
+  hostless meetup shows "to be decided".
+- **Staging seed** (boot block, `IS_STAGING` only): suggestions 900001 to
+  900003, titled "Staging demo: The Midnight Library", "Staging demo:
+  Piranesi" and "Staging demo: Project Hail Mary", owned by the fake
+  `staging-demo-reader`, with 900001 set as the current pick, and the
+  stored host anchored to the meetup current at seed time (COALESCE, so
+  nothing already stored is overwritten). The empty screen stays
+  reachable: no logic reads the seed's presence.
