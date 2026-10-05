@@ -90,6 +90,11 @@ app.get(/^\/usernode-(?:bridge|native|tailwind)\//, async (req, res) => {
 // staging container reads either. See "Time-dependent features" in the
 // platform conventions.
 const IS_STAGING = process.env.USERNODE_ENV === 'staging';
+
+// Set while the graceful-shutdown handler below is draining (see "Graceful
+// shutdown" in the platform conventions); /health answers 503 meanwhile.
+const DRAIN_MS = 3000;
+let shuttingDown = false;
 const PREVIEW_NOW = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
 function requestNow(req) {
   const raw = IS_STAGING ? (req.headers['x-usernode-now'] || req.query['un-now']) : null;
@@ -145,7 +150,10 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+app.get('/health', (_req, res) => {
+  if (shuttingDown) return res.status(503).json({ status: 'shutting-down' });
+  res.json({ status: 'ok' });
+});
 
 // The template ships no favicon file; index.html carries an inline SVG
 // icon instead. Answer 204 here so anything that still probes
@@ -154,29 +162,199 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 // fresh load.
 app.get('/favicon.ico', (_req, res) => res.status(204).end());
 
-// Button press
-app.post('/api/press', async (req, res) => {
+// ── Page Turners ─────────────────────────────────────────────────────────
+// The club's data. Two public tables (created in the boot block below):
+// `suggestions` holds every proposed book; the single `club_state` row
+// holds which one is this month's read and who hosts the next meetup.
+//
+// All meetup maths is UTC (see CLAUDE.md): the club meets on the last
+// Thursday of each month at 19:00. "Now" comes from req.now, never
+// new Date(), so a staging preview can be shown as of a chosen moment.
+
+const PLATFORM_API_BASE = process.env.USERNODE_PLATFORM_API_V1_URL
+  || process.env.USERNODE_PLATFORM_API_URL;
+
+// The platform's member list, cached for a minute (the endpoint shares its
+// rate limit with the /users/* family). Unavailable for guests (403),
+// outside the platform, or on any failure: the page still renders, it just
+// can't rotate or initialise the host.
+const rosterCache = { at: 0, members: null };
+async function getRoster(userToken) {
+  if (!PLATFORM_API_BASE || !userToken) return null;
+  const at = Date.now();
+  if (rosterCache.members && at - rosterCache.at < 60_000) return rosterCache.members;
   try {
-    await pool.query(`
-      INSERT INTO presses (user_id, username) VALUES ($1, $2)
-    `, [req.user.id, req.user.username]);
-    res.json({ ok: true });
+    const headers = { 'x-usernode-user-token': userToken };
+    if (process.env.USERNODE_LLM_PROXY_TOKEN) {
+      headers['x-usernode-app-token'] = process.env.USERNODE_LLM_PROXY_TOKEN;
+    }
+    const resp = await fetch(PLATFORM_API_BASE + '/members', { headers });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    if (!Array.isArray(data.members) || data.members.length === 0) return null;
+    rosterCache.members = data.members;
+    rosterCache.at = at;
+    return rosterCache.members;
+  } catch {
+    return null;
+  }
+}
+
+// The last Thursday of `monthIndex` (a Date.UTC month index; values past 11
+// roll into the next year) at 19:00 UTC.
+function lastThursdayAt19(year, monthIndex) {
+  const lastDay = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+  const lastDow = new Date(Date.UTC(year, monthIndex, lastDay)).getUTCDay();
+  const day = lastDay - ((lastDow - 4 + 7) % 7); // 4 = Thursday
+  return new Date(Date.UTC(year, monthIndex, day, 19, 0, 0));
+}
+
+// The first meetup strictly after `now`; on the meetup's own evening the
+// answer is already next month's.
+function nextMeetup(now) {
+  const thisMonth = lastThursdayAt19(now.getUTCFullYear(), now.getUTCMonth());
+  return thisMonth.getTime() > now.getTime()
+    ? thisMonth
+    : lastThursdayAt19(now.getUTCFullYear(), now.getUTCMonth() + 1);
+}
+
+// The meetup after the given one: next month's last Thursday.
+function meetupAfter(at) {
+  return lastThursdayAt19(at.getUTCFullYear(), at.getUTCMonth() + 1);
+}
+
+// The meetup to show and who hosts it, advancing the stored host lazily:
+// every meetup that has passed moves the host one place on through the
+// member list (creator first, wrapping), and the new host and meetup are
+// stored. With a roster but no stored host, the member after the creator
+// hosts first (the creator's v1 choice); with no roster, the stored host
+// stands and a hostless meetup shows "to be decided" on the page.
+async function resolveMeetup(req) {
+  const next = nextMeetup(req.now);
+  const { rows } = await pool.query(
+    'SELECT host_username, host_meetup_at FROM club_state WHERE id = 1'
+  );
+  const stored = rows[0] || {};
+  let host = stored.host_username || null;
+  let at = stored.host_meetup_at ? new Date(stored.host_meetup_at) : null;
+  const roster = await getRoster(req.query.token || req.headers['x-usernode-token']);
+  if (roster) {
+    const names = roster.map((m) => m.username);
+    if (!host) {
+      host = names[Math.min(1, names.length - 1)];
+      at = next;
+      await pool.query(
+        'UPDATE club_state SET host_username = $1, host_meetup_at = $2 WHERE id = 1',
+        [host, at]
+      );
+    } else {
+      let idx = names.indexOf(host);
+      let changed = false;
+      if (!at) { at = next; changed = true; }
+      while (at.getTime() <= req.now.getTime()) {
+        idx = (idx + 1) % names.length; // a host no longer on the roster falls to the creator
+        at = meetupAfter(at);
+        changed = true;
+      }
+      if (changed) {
+        host = names[idx];
+        await pool.query(
+          'UPDATE club_state SET host_username = $1, host_meetup_at = $2 WHERE id = 1',
+          [host, at]
+        );
+      }
+    }
+  }
+  return { at: next, host };
+}
+
+// Everything the club screen needs, in one read. Guests may read: the page
+// says "You" only when the viewer matches the suggester.
+app.get('/api/club', async (req, res) => {
+  try {
+    const meetup = await resolveMeetup(req);
+    const { rows: readRows } = await pool.query(`
+      SELECT s.id, s.title, s.author, s.suggested_by_username
+      FROM club_state c JOIN suggestions s ON s.id = c.current_suggestion_id
+      WHERE c.id = 1
+    `);
+    const { rows: sugRows } = await pool.query(`
+      SELECT s.id, s.title, s.author, s.suggested_by_username,
+             COALESCE(s.id = c.current_suggestion_id, false) AS is_current
+      FROM suggestions s CROSS JOIN club_state c
+      WHERE c.id = 1
+      ORDER BY s.created_at DESC, s.id DESC
+      LIMIT 50
+    `);
+    const read = readRows[0];
+    res.json({
+      viewer: req.user ? req.user.username : null,
+      currentRead: read
+        ? { id: read.id, title: read.title, author: read.author, suggestedBy: read.suggested_by_username }
+        : null,
+      meetup: { at: meetup.at.toISOString(), host: meetup.host },
+      suggestions: sugRows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        author: r.author,
+        suggestedBy: r.suggested_by_username,
+        isCurrentRead: r.is_current,
+      })),
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Leaderboard
-app.get('/api/leaderboard', async (_req, res) => {
+// Suggest a book. Title required (whitespace trimmed away), author optional.
+app.post('/api/suggestions', async (req, res) => {
   try {
+    const body = req.body || {};
+    const title = typeof body.title === 'string' ? body.title.trim() : '';
+    const author = typeof body.author === 'string' ? body.author.trim() : '';
+    if (!title) {
+      return res.status(400).json({ error: 'validation', message: 'A title is required.' });
+    }
+    if (title.length > 200) {
+      return res.status(400).json({ error: 'validation', message: 'Keep the title to 200 characters or fewer.' });
+    }
+    if (author.length > 120) {
+      return res.status(400).json({ error: 'validation', message: 'Keep the author to 120 characters or fewer.' });
+    }
     const { rows } = await pool.query(`
-      SELECT username, COUNT(*) as presses
-      FROM presses
-      GROUP BY username
-      ORDER BY presses DESC
-      LIMIT 50
-    `);
-    res.json({ leaderboard: rows });
+      INSERT INTO suggestions (title, author, suggested_by_user_id, suggested_by_username)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id, title, author, suggested_by_username
+    `, [title, author || null, req.user.id, req.user.username]);
+    const r = rows[0];
+    res.status(201).json({
+      suggestion: {
+        id: r.id,
+        title: r.title,
+        author: r.author,
+        suggestedBy: r.suggested_by_username,
+        isCurrentRead: false,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Set which suggestion is this month's read. Any signed-in member may.
+app.post('/api/current-read', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const id = Number(body.suggestionId);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'validation', message: 'Pick a suggestion to set.' });
+    }
+    const { rowCount } = await pool.query('SELECT id FROM suggestions WHERE id = $1', [id]);
+    if (!rowCount) {
+      return res.status(400).json({ error: 'validation', message: 'That suggestion is no longer on the list.' });
+    }
+    await pool.query('UPDATE club_state SET current_suggestion_id = $1 WHERE id = 1', [id]);
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -219,18 +397,84 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Platform convention (see "Graceful shutdown"): stop accepting
+// connections, drain briefly, close the pool and exit. Idempotent: a
+// repeat signal during the drain is a no-op, not a second teardown.
+function setupShutdown(server) {
+  async function shutdown(signal) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`[shutdown] ${signal} received, draining`);
+    server.close(() => {});
+    server.closeIdleConnections?.();
+    const t = setTimeout(() => server.closeAllConnections?.(), DRAIN_MS);
+    t.unref?.();
+    try {
+      await pool.end();
+    } catch (e) {
+      console.error('[shutdown] pool.end failed', e.message);
+    }
+    process.exit(0);
+  }
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+}
+
 async function start() {
+  // One-time cleanup of the starter template's demo table, now that the
+  // screen it served is gone.
+  await pool.query('DROP TABLE IF EXISTS presses');
+
+  // The club's two tables, both public (they carry only book titles and
+  // usernames). One `club_state` row holds the current pick and the stored
+  // host, so the host advances without any cron.
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS presses (
+    CREATE TABLE IF NOT EXISTS suggestions (
       id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL,
-      username VARCHAR(255) NOT NULL,
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      title VARCHAR(200) NOT NULL,
+      author VARCHAR(120),
+      suggested_by_user_id INTEGER NOT NULL,
+      suggested_by_username VARCHAR(255) NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS club_state (
+      id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+      current_suggestion_id INTEGER REFERENCES suggestions(id),
+      host_username VARCHAR(255),
+      host_meetup_at TIMESTAMPTZ
+    )
+  `);
+  await pool.query('INSERT INTO club_state (id) VALUES (1) ON CONFLICT DO NOTHING');
+
+  if (IS_STAGING) {
+    // Obviously fake demo rows for previews and checks, owned by a fake
+    // identity — never by whoever opened the preview. The stored host is
+    // the creator's real v1 choice (priya_t1006), anchored to the meetup
+    // current at seed time; COALESCE keeps anything already stored, so the
+    // empty screen stays reachable by simply not setting a pick.
+    await pool.query(`
+      INSERT INTO suggestions (id, title, author, suggested_by_user_id, suggested_by_username)
+      VALUES
+        (900001, 'Staging demo: The Midnight Library', 'Matt Haig', -1, 'staging-demo-reader'),
+        (900002, 'Staging demo: Piranesi', 'Susanna Clarke', -1, 'staging-demo-reader'),
+        (900003, 'Staging demo: Project Hail Mary', 'Andy Weir', -1, 'staging-demo-reader')
+      ON CONFLICT (id) DO NOTHING
+    `);
+    await pool.query(`
+      UPDATE club_state
+      SET current_suggestion_id = COALESCE(current_suggestion_id, 900001),
+          host_username = COALESCE(host_username, 'priya_t1006'),
+          host_meetup_at = COALESCE(host_meetup_at, $1)
+      WHERE id = 1
+    `, [nextMeetup(new Date())]);
+  }
+
   const server = app.listen(port, () => console.log(`Listening on :${port}`));
   // Let Envoy retire idle upstream connections at 60s, with a 15s margin.
   server.keepAliveTimeout = 75_000;
+  setupShutdown(server);
 }
 
 start().catch(err => { console.error(err); process.exit(1); });

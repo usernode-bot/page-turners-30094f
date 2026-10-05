@@ -1,3 +1,14 @@
 {
-  "secrets": []
+  "secrets": [],
+  "tests": [
+    {
+      "id": "club.default",
+      "name": "Club screen renders",
+      "path": "/",
+      "expectText": "This month's read",
+      "visual": true,
+      "impact": ["public/index.html", "server.js", "styles/tailwind-input.css"]
+    },
+    { "name": "Suggestions list renders", "path": "/", "expectText": "Suggestions" }
+  ]
 }
