@@ -122,6 +122,14 @@ a dark value (named in `tailwind.config.js`), and a few components
 Re-theme by changing the token values there, keeping every text pair at
 4.5:1 or more in both looks.
 
+### Assumptions
+
+- A **"Books read"** section (a new word not in the original sketch) was
+  added below Suggestions after the original sketch: every book the club
+  finishes moves there when a new pick is set, with each member's 1-5 star
+  rating. Stars are small inline SVG icons in the accent/muted tokens.
+  Recorded here as the sketch change that feature makes.
+
 - Colour comes only from the tokens (`bg-ground`, `bg-surface`,
   `text-fg`, `text-muted`, `border-line`, `bg-accent` with
   `text-on-accent`, ...): never a raw hex value or a stock palette class.
@@ -145,6 +153,14 @@ Re-theme by changing the token values there, keeping every text pair at
   so a staging preview can be shown as of a chosen moment.
 - **`suggestions` is append-only in v1**: no editing, deleting or voting.
   `POST /api/current-read` (setting the month's read) is the decision.
+- **`read_books` and `ratings`**: when `POST /api/current-read` replaces the
+  pick, the outgoing book is archived into `read_books` (title, author and
+  suggester carried over from the suggestion, `finished_at` from `req.now`;
+  `UNIQUE (suggestion_id)` + `ON CONFLICT DO NOTHING` make a re-pick
+  idempotent so a book never appears twice). `ratings` holds one 1-5 star
+  rating per signed-in member per read book (primary key on
+  `read_book_id, user_id`); `POST /api/ratings` upserts it. Both tables are
+  public (titles and usernames only).
 - **Host rotation is a lazy read-time advance**: the single `club_state`
   row stores the host and the meetup they anchor; when `GET /api/club`
   finds that meetup in the past, it rotates the host one place per missed
@@ -158,5 +174,10 @@ Re-theme by changing the token values there, keeping every text pair at
   Piranesi" and "Staging demo: Project Hail Mary", owned by the fake
   `staging-demo-reader`, with 900001 set as the current pick, and the
   stored host anchored to the meetup current at seed time (COALESCE, so
-  nothing already stored is overwritten). The empty screen stays
+  nothing already stored is overwritten). Also two archived books in
+  `read_books`, 900001 "Staging demo: The Left Hand of Darkness" (rated 5
+  by `staging-demo-reader`, 4 by `staging-demo-rater`) and 900002 "Staging
+  demo: Circe" (rated 3 by `staging-demo-reader`), `suggestion_id` NULL and
+  `finished_at` staggered past dates. No unrated book is seeded, so the
+  "No ratings yet" state stays reachable. The empty screen stays
   reachable: no logic reads the seed's presence.

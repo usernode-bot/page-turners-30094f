@@ -207,6 +207,23 @@
       </div>
     </section>
 
+    <!-- Books the club has finished, with everyone's star ratings. A book
+         arrives here when a new pick is set as This month's read. -->
+    <section id="sec-booksread" class="px-4 py-6 border-t border-line">
+      <p class="section-label text-muted font-medium mb-3">Books read</p>
+      <div id="br-loading" class="list" role="status">
+        <span class="sr-only">Loading books read</span>
+        <div class="list-row"><div class="skeleton h-4 w-1/2"></div></div>
+        <div class="list-row"><div class="skeleton h-4 w-2/5"></div></div>
+      </div>
+      <ul id="br-list" class="list" hidden></ul>
+      <div id="br-empty" class="state-empty" hidden>
+        <p class="text-heading">Nothing read yet</p>
+        <p class="text-body text-muted">Pick a new read and it will show up here.</p>
+      </div>
+      <p id="br-error" class="text-small text-danger mt-2" hidden></p>
+    </section>
+
     <section class="px-4 py-6 border-t border-line">
       <!-- The small form the button opens, inline on the same screen. -->
       <form id="suggest-form" class="flex flex-col gap-3" hidden>
@@ -257,12 +274,15 @@
       const els = {
         screenError: $('screen-error'), retry: $('retry-btn'),
         secRead: $('sec-read'), secMeetup: $('sec-meetup'), secSug: $('sec-suggestions'),
+        secBooksRead: $('sec-booksread'),
         readLoading: $('read-loading'), readData: $('read-data'), readEmpty: $('read-empty'),
         readTitle: $('read-title'), readAuthor: $('read-author'), readDue: $('read-due'),
         meetupLoading: $('meetup-loading'), meetupData: $('meetup-data'),
         meetupHost: $('meetup-host'), meetupDate: $('meetup-date'),
         meetupBar: $('meetup-bar'), meetupCount: $('meetup-count'),
         sugLoading: $('sug-loading'), sugList: $('sug-list'), sugEmpty: $('sug-empty'),
+        brLoading: $('br-loading'), brList: $('br-list'), brEmpty: $('br-empty'),
+        brError: $('br-error'),
         form: $('suggest-form'), open: $('suggest-open'), cancel: $('suggest-cancel'),
         title: $('suggest-title'), author: $('suggest-author'),
         error: $('suggest-error'), submit: $('suggest-submit'),
@@ -285,8 +305,9 @@
         els.secRead.hidden = !visible;
         els.secMeetup.hidden = !visible;
         els.secSug.hidden = !visible;
+        els.secBooksRead.hidden = !visible;
         if (state === 'loading') {
-          setRead('loading'); setMeetup('loading'); setSug('loading');
+          setRead('loading'); setMeetup('loading'); setSug('loading'); setBooksRead('loading');
         }
       }
       function setRead(state) {
@@ -302,6 +323,11 @@
         els.sugLoading.hidden = state !== 'loading';
         els.sugList.hidden = state !== 'list';
         els.sugEmpty.hidden = state !== 'empty';
+      }
+      function setBooksRead(state) {
+        els.brLoading.hidden = state !== 'loading';
+        els.brList.hidden = state !== 'list';
+        els.brEmpty.hidden = state !== 'empty';
       }
 
       // "thursday, 31 october" — the sketch's spelling, from the date's own
@@ -351,6 +377,7 @@
         els.meetupDate.textContent = longDate(club.meetup.at);
         updateCountdown();
         renderSuggestions();
+        renderBooksRead();
       }
 
       function currentReadTag() {
@@ -399,6 +426,163 @@
         els.sugList.replaceChildren(...list.map(suggestionRow));
       }
 
+      // A star icon, drawn inline so it can take the amber accent token
+      // (filled) or the muted line colour (empty) in both looks. No emoji,
+      // no images. `size` is a whole-literal class pair so the Tailwind
+      // extractor sees it.
+      const STAR_PATH =
+        'M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z';
+      function starIcon(filled, size) {
+        const NS = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(NS, 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.setAttribute('focusable', 'false');
+        svg.classList.add('shrink-0');
+        svg.classList.add(filled ? 'text-accent' : 'text-muted');
+        size.split(' ').forEach((c) => svg.classList.add(c));
+        const path = document.createElementNS(NS, 'path');
+        path.setAttribute('fill', 'currentColor');
+        path.setAttribute('d', STAR_PATH);
+        svg.appendChild(path);
+        return svg;
+      }
+
+      // Five stars filled to the nearest whole star, with the exact average
+      // beside it; "No ratings yet" when nobody has rated.
+      function avgStarsLine(book) {
+        const line = document.createElement('div');
+        line.className = 'mt-2 flex items-center gap-0.5';
+        if (book.avgStars == null) {
+          const p = document.createElement('p');
+          p.className = 'text-small text-muted';
+          p.textContent = 'No ratings yet';
+          line.appendChild(p);
+          return line;
+        }
+        const filled = Math.round(book.avgStars);
+        for (let i = 1; i <= 5; i++) line.appendChild(starIcon(i <= filled, 'w-4 h-4'));
+        const n = document.createElement('span');
+        n.className = 'text-small text-muted ml-1';
+        n.textContent = Number(book.avgStars).toFixed(1);
+        line.appendChild(n);
+        return line;
+      }
+
+      // The viewer's own five stars: tappable buttons for a signed-in
+      // member (44 px hit area each), a plain untappable row for guests.
+      function viewerStarsRow(book) {
+        const row = document.createElement('div');
+        row.className = 'mt-1 flex items-center';
+        const mine = (book.ratings || []).find((r) => r.isViewer);
+        const myStars = mine ? mine.stars : 0;
+        if (club.viewer) {
+          const buttons = [];
+          for (let i = 1; i <= 5; i++) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className =
+              'inline-flex h-11 w-11 items-center justify-center rounded-md'
+              + ' focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+              + ' disabled:cursor-not-allowed disabled:opacity-50';
+            b.setAttribute('aria-label', 'Rate ' + i + ' of 5');
+            b.appendChild(starIcon(i <= myStars, 'w-6 h-6'));
+            b.addEventListener('click', () => rateBook(book, i, buttons));
+            buttons.push(b);
+            row.appendChild(b);
+          }
+        } else {
+          row.classList.add('gap-0.5', 'py-2.5');
+          for (let i = 1; i <= 5; i++) row.appendChild(starIcon(false, 'w-6 h-6'));
+        }
+        return row;
+      }
+
+      // Every name goes in as text, never as HTML.
+      function bookRow(book) {
+        const li = document.createElement('li');
+        li.className = 'list-row items-start';
+        const main = document.createElement('div');
+        main.className = 'grow min-w-0';
+        const t = document.createElement('p');
+        t.className = 'text-body font-medium text-fg';
+        t.textContent = book.title;
+        main.appendChild(t);
+        if (book.author) {
+          const a = document.createElement('p');
+          a.className = 'text-small text-muted mt-1';
+          a.textContent = book.author;
+          main.appendChild(a);
+        }
+        const by = document.createElement('p');
+        by.className = 'text-small text-muted mt-1';
+        by.textContent = 'Suggested by '
+          + (club.viewer && club.viewer === book.suggestedBy ? 'You' : book.suggestedBy);
+        main.appendChild(by);
+        const finished = document.createElement('p');
+        finished.className = 'text-small text-muted mt-1';
+        finished.textContent = 'Finished ' + shortDate(book.finishedAt);
+        main.appendChild(finished);
+        main.appendChild(avgStarsLine(book));
+        (book.ratings || []).forEach((r) => {
+          const p = document.createElement('p');
+          p.className = 'text-small text-muted mt-1';
+          p.textContent = (club.viewer && r.isViewer ? 'You' : r.username)
+            + ' · ' + (r.stars === 1 ? '1 star' : r.stars + ' stars');
+          main.appendChild(p);
+        });
+        main.appendChild(viewerStarsRow(book));
+        li.appendChild(main);
+        return li;
+      }
+
+      function renderBooksRead() {
+        const list = club.booksRead || [];
+        if (!list.length) {
+          setBooksRead('empty');
+          return;
+        }
+        setBooksRead('list');
+        els.brList.replaceChildren(...list.map(bookRow));
+      }
+
+      // Rate a book, or change your rating. The buttons lock while the
+      // request is in flight; a 401 is account_required (the bridge shows
+      // the platform's nudge), anything else gets the small error line.
+      async function rateBook(book, stars, buttons) {
+        els.brError.hidden = true;
+        buttons.forEach((b) => { b.disabled = true; });
+        try {
+          const res = await api('/api/ratings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ readBookId: book.id, stars: stars }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const entry = (club.booksRead || []).find((b) => b.id === book.id);
+            if (entry) {
+              const mine = (entry.ratings || []).find((r) => r.isViewer);
+              if (mine) mine.stars = data.rating.stars;
+              else if (entry.ratings) entry.ratings.push({ username: club.viewer, stars: data.rating.stars, isViewer: true });
+              else entry.ratings = [{ username: club.viewer, stars: data.rating.stars, isViewer: true }];
+              entry.avgStars = data.avgStars;
+            }
+            renderBooksRead();
+            return;
+          }
+          if (res.status !== 401) {
+            els.brError.textContent = 'Could not save your rating. Try again.';
+            els.brError.hidden = false;
+            buttons.forEach((b) => { b.disabled = false; });
+          }
+        } catch {
+          els.brError.textContent = 'Could not save your rating. Try again.';
+          els.brError.hidden = false;
+          buttons.forEach((b) => { b.disabled = false; });
+        }
+      }
+
       // Choosing a suggestion makes it this month's read, here and in the
       // read card. A 401 is account_required: the bridge shows the
       // platform's "make an account" nudge, so guests get the same UI.
@@ -414,6 +598,18 @@
             club.currentRead = { id: s.id, title: s.title, author: s.author, suggestedBy: s.suggestedBy };
             club.suggestions.forEach((x) => { x.isCurrentRead = x.id === s.id; });
             render();
+            // The book just replaced moved down to Books read on the
+            // server, with its ratings. Re-fetch in the background (no
+            // loading skeletons) so the archive stays server-driven.
+            api('/api/club')
+              .then((r) => (r.ok ? r.json() : null))
+              .then((data) => {
+                if (data) {
+                  club = data;
+                  render();
+                }
+              })
+              .catch(() => {});
             return;
           }
           if (res.status !== 401) btn.disabled = false;
