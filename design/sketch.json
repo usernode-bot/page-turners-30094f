@@ -1,5 +1,5 @@
 {
-  "note": "The sketch this app's creator was shown when they made it (design/sketch.html). The first version keeps its layout, its words and its accent; any deviation is listed under Assumptions with the reason.",
+  "note": "The sketch this app's creator was shown when they made it (design/sketch.html). The first version keeps its layout, its words and its accent; any deviation is listed under Assumptions with the reason. Later addition, after the original sketch: a Books read section below Suggestions, listing the books the club has finished with everyone's 1-5 star ratings (words/layout above unchanged).",
   "job": "See this month's book, who's hosting, and when you're meeting next",
   "words": {
     "the_book": "this month's read",

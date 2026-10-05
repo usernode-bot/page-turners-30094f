@@ -163,9 +163,11 @@ app.get('/health', (_req, res) => {
 app.get('/favicon.ico', (_req, res) => res.status(204).end());
 
 // ── Page Turners ─────────────────────────────────────────────────────────
-// The club's data. Two public tables (created in the boot block below):
+// The club's data. Four public tables (created in the boot block below):
 // `suggestions` holds every proposed book; the single `club_state` row
-// holds which one is this month's read and who hosts the next meetup.
+// holds which one is this month's read and who hosts the next meetup;
+// `read_books` holds the books the club has finished (archived when a new
+// pick is set) and `ratings` each member's 1-5 stars on a read book.
 //
 // All meetup maths is UTC (see CLAUDE.md): the club meets on the last
 // Thursday of each month at 19:00. "Now" comes from req.now, never
@@ -287,12 +289,45 @@ app.get('/api/club', async (req, res) => {
       LIMIT 50
     `);
     const read = readRows[0];
+    // The books the club has finished, newest first, each with the average
+    // of its ratings and every member's own rating (the viewer's flagged).
+    // Guests may read: the viewer id is null and every isViewer comes out
+    // false, so this query must not assume req.user.
+    const { rows: bookRows } = await pool.query(`
+      SELECT rb.id, rb.title, rb.author, rb.suggested_by_username,
+             rb.finished_at,
+             ROUND(AVG(rt.stars)::numeric, 1) AS avg_stars,
+             COALESCE(
+               JSON_AGG(
+                 JSON_BUILD_OBJECT(
+                   'username', rt.username,
+                   'stars', rt.stars,
+                   'isViewer', COALESCE(rt.user_id = $1::integer, false)
+                 ) ORDER BY rt.stars DESC, rt.username ASC
+               ) FILTER (WHERE rt.user_id IS NOT NULL),
+               '[]'::json
+             ) AS ratings
+      FROM read_books rb
+      LEFT JOIN ratings rt ON rt.read_book_id = rb.id
+      GROUP BY rb.id
+      ORDER BY rb.finished_at DESC, rb.id DESC
+      LIMIT 50
+    `, [req.user ? req.user.id : null]);
     res.json({
       viewer: req.user ? req.user.username : null,
       currentRead: read
         ? { id: read.id, title: read.title, author: read.author, suggestedBy: read.suggested_by_username }
         : null,
       meetup: { at: meetup.at.toISOString(), host: meetup.host },
+      booksRead: bookRows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        author: r.author,
+        suggestedBy: r.suggested_by_username,
+        finishedAt: r.finished_at.toISOString(),
+        avgStars: r.avg_stars === null ? null : Number(r.avg_stars),
+        ratings: r.ratings,
+      })),
       suggestions: sugRows.map((r) => ({
         id: r.id,
         title: r.title,
@@ -353,8 +388,65 @@ app.post('/api/current-read', async (req, res) => {
     if (!rowCount) {
       return res.status(400).json({ error: 'validation', message: 'That suggestion is no longer on the list.' });
     }
+    // The book being replaced moves down to Books read. Picking the
+    // suggestion that is already current stays a plain no-op; the UNIQUE
+    // constraint on suggestion_id plus ON CONFLICT DO NOTHING makes a
+    // re-pick of a past book idempotent, so it never appears twice.
+    const { rows: outgoing } = await pool.query(`
+      SELECT s.id AS suggestion_id, s.title, s.author,
+             s.suggested_by_user_id, s.suggested_by_username
+      FROM club_state c JOIN suggestions s ON s.id = c.current_suggestion_id
+      WHERE c.id = 1 AND c.current_suggestion_id IS DISTINCT FROM $1
+    `, [id]);
+    if (outgoing.length) {
+      const o = outgoing[0];
+      await pool.query(`
+        INSERT INTO read_books
+          (suggestion_id, title, author, suggested_by_user_id, suggested_by_username, finished_at)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (suggestion_id) DO NOTHING
+      `, [o.suggestion_id, o.title, o.author, o.suggested_by_user_id, o.suggested_by_username, req.now]);
+    }
     await pool.query('UPDATE club_state SET current_suggestion_id = $1 WHERE id = 1', [id]);
     res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Rate a book on the Books read list. One rating of 1 to 5 per signed-in
+// member per book; rating again changes it. (Guests are answered 401
+// `account_required` by the auth middleware above, before this runs.)
+app.post('/api/ratings', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const readBookId = body.readBookId;
+    const stars = body.stars;
+    if (!Number.isInteger(readBookId)) {
+      return res.status(400).json({ error: 'validation', message: 'Pick a book to rate.' });
+    }
+    if (!Number.isInteger(stars) || stars < 1 || stars > 5) {
+      return res.status(400).json({ error: 'validation', message: 'Rate between 1 and 5 stars.' });
+    }
+    const { rowCount } = await pool.query('SELECT id FROM read_books WHERE id = $1', [readBookId]);
+    if (!rowCount) {
+      return res.status(400).json({ error: 'validation', message: 'That book is not on the shelf.' });
+    }
+    const { rows } = await pool.query(`
+      INSERT INTO ratings (read_book_id, user_id, username, stars)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (read_book_id, user_id)
+      DO UPDATE SET stars = EXCLUDED.stars
+      RETURNING stars
+    `, [readBookId, req.user.id, req.user.username, stars]);
+    const { rows: avgRows } = await pool.query(
+      'SELECT ROUND(AVG(stars)::numeric, 1) AS avg_stars FROM ratings WHERE read_book_id = $1',
+      [readBookId]
+    );
+    res.json({
+      rating: { stars: rows[0].stars, isViewer: true },
+      avgStars: avgRows[0].avg_stars === null ? null : Number(avgRows[0].avg_stars),
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -448,6 +540,32 @@ async function start() {
   `);
   await pool.query('INSERT INTO club_state (id) VALUES (1) ON CONFLICT DO NOTHING');
 
+  // Books the club has finished and everyone's stars on them, both public
+  // (titles and usernames only). `UNIQUE (suggestion_id)` makes archiving
+  // idempotent: re-picking a past book never creates a second row. The
+  // primary key on `ratings` is the one-rating-per-member rule.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS read_books (
+      id SERIAL PRIMARY KEY,
+      suggestion_id INTEGER REFERENCES suggestions(id),
+      title VARCHAR(200) NOT NULL,
+      author VARCHAR(120),
+      suggested_by_user_id INTEGER NOT NULL,
+      suggested_by_username VARCHAR(255) NOT NULL,
+      finished_at TIMESTAMPTZ NOT NULL,
+      CONSTRAINT read_books_suggestion_unique UNIQUE (suggestion_id)
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ratings (
+      read_book_id INTEGER NOT NULL REFERENCES read_books(id),
+      user_id INTEGER NOT NULL,
+      username VARCHAR(255) NOT NULL,
+      stars INTEGER NOT NULL CHECK (stars BETWEEN 1 AND 5),
+      PRIMARY KEY (read_book_id, user_id)
+    )
+  `);
+
   if (IS_STAGING) {
     // Obviously fake demo rows for previews and checks, owned by a fake
     // identity — never by whoever opened the preview. The stored host is
@@ -469,6 +587,35 @@ async function start() {
           host_meetup_at = COALESCE(host_meetup_at, $1)
       WHERE id = 1
     `, [nextMeetup(new Date())]);
+
+    // Two books the club has already finished, with a few ratings from the
+    // same fake identities, so the populated Books read section can be
+    // seen. A book nobody rated is deliberately not seeded, so the "No
+    // ratings yet" state stays reachable too. No logic reads the seed's
+    // presence, so the empty states stay reachable by simply not having
+    // the rows.
+    const seeded = new Date();
+    await pool.query(`
+      INSERT INTO read_books
+        (id, suggestion_id, title, author, suggested_by_user_id, suggested_by_username, finished_at)
+      VALUES
+        (900001, NULL, 'Staging demo: The Left Hand of Darkness', 'Ursula K. Le Guin',
+         -1, 'staging-demo-reader', $1),
+        (900002, NULL, 'Staging demo: Circe', 'Madeline Miller',
+         -1, 'staging-demo-reader', $2)
+      ON CONFLICT (id) DO NOTHING
+    `, [
+      new Date(seeded.getTime() - 35 * 86400000),
+      new Date(seeded.getTime() - 65 * 86400000),
+    ]);
+    await pool.query(`
+      INSERT INTO ratings (read_book_id, user_id, username, stars)
+      VALUES
+        (900001, -1, 'staging-demo-reader', 5),
+        (900001, -2, 'staging-demo-rater', 4),
+        (900002, -1, 'staging-demo-reader', 3)
+      ON CONFLICT (read_book_id, user_id) DO NOTHING
+    `);
   }
 
   const server = app.listen(port, () => console.log(`Listening on :${port}`));
