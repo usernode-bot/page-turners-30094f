@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Page Turners: a sketch</title>
+<!-- A sketch Homeroom made from this app's description when it was created,
+     so its creator saw something of theirs straight away. Static: nothing on
+     it works. The first version keeps its layout, its words and its accent
+     (design/sketch.json says them in words). -->
+<style>
+:root{--ground:250 250 249;--surface:255 255 255;--raised:245 245 244;--fg:28 25 23;--muted:87 83 78;--line:231 229 228;--accent:149 96 7;--on-accent:255 255 255;--danger:185 28 28;--on-danger:255 255 255;--focus:149 96 7}
+@media (prefers-color-scheme: dark){:root{--ground:12 10 9;--surface:28 25 23;--raised:41 37 36;--fg:245 245 244;--muted:168 162 158;--line:68 64 60;--accent:251 191 36;--on-accent:28 25 23;--danger:248 113 113;--on-danger:69 10 10;--focus:251 191 36}}
+*,::before,::after{box-sizing:border-box;border:0 solid rgb(229 231 235);margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;font-family:ui-sans-serif,system-ui,sans-serif,"Apple Color Emoji","Segoe UI Emoji";line-height:1.5}
+body{background-color:rgb(var(--ground));color:rgb(var(--fg))}
+h1,h2,h3,h4{font-size:inherit;font-weight:inherit}
+ol,ul{list-style:none}
+button,input,select,textarea{font:inherit;color:inherit;background-color:transparent}
+button{cursor:default}
+table{border-collapse:collapse;width:100%}
+hr{border-top-width:1px;border-color:rgb(var(--line))}
+[hidden]{display:none!important}
+.sketch-screen{margin:0 auto;display:flex;max-width:28rem;flex-direction:column;gap:2rem;padding:2.5rem 1rem}
+.btn-primary,.btn-secondary{display:inline-flex;min-height:2.75rem;min-width:2.75rem;align-items:center;justify-content:center;gap:0.5rem;border-radius:0.5rem;padding:0 1rem;font-size:1rem;line-height:1.5rem;font-weight:500}
+.btn-primary{background-color:rgb(var(--accent));color:rgb(var(--on-accent))}
+.btn-secondary{border:1px solid rgb(var(--line));background-color:rgb(var(--surface));color:rgb(var(--fg))}
+.field{display:block;min-height:2.75rem;width:100%;border-radius:0.5rem;border:1px solid rgb(var(--line));background-color:rgb(var(--surface));padding:0.5rem 0.75rem;font-size:1rem;line-height:1.5rem;color:rgb(var(--fg))}
+.field::placeholder{color:rgb(var(--muted))}
+.list{overflow:hidden;border-radius:0.75rem;border:1px solid rgb(var(--line));background-color:rgb(var(--surface))}
+.list>*+*{border-top:1px solid rgb(var(--line))}
+.list-row{display:flex;min-height:2.75rem;align-items:center;gap:0.75rem;padding:0.75rem 1rem}
+.card{border-radius:0.75rem;border:1px solid rgb(var(--line));background-color:rgb(var(--surface));padding:1rem}
+.section-label{margin-bottom:0.5rem;padding:0 0.25rem;font-size:0.875rem;line-height:1.25rem;font-weight:500;color:rgb(var(--muted))}
+.skeleton{border-radius:0.375rem;background-color:rgb(var(--line))}
+.state-empty{display:flex;flex-direction:column;align-items:center;gap:0.5rem;padding:2rem 1rem;text-align:center}
+.text-title{font-size:1.75rem;line-height:2.25rem;font-weight:700}
+.text-heading{font-size:1.25rem;line-height:1.75rem;font-weight:600}
+.text-body{font-size:1rem;line-height:1.5rem}
+.text-small{font-size:0.875rem;line-height:1.25rem}
+.font-medium{font-weight:500}
+.font-semibold{font-weight:600}
+.font-bold{font-weight:700}
+.text-center{text-align:center}
+.text-right{text-align:right}
+.tabular-nums{font-variant-numeric:tabular-nums}
+.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.line-through{text-decoration-line:line-through}
+.text-fg{color:rgb(var(--fg))}
+.text-muted{color:rgb(var(--muted))}
+.text-accent{color:rgb(var(--accent))}
+.text-on-accent{color:rgb(var(--on-accent))}
+.text-danger{color:rgb(var(--danger))}
+.bg-ground{background-color:rgb(var(--ground))}
+.bg-surface{background-color:rgb(var(--surface))}
+.bg-raised{background-color:rgb(var(--raised))}
+.bg-line{background-color:rgb(var(--line))}
+.bg-accent{background-color:rgb(var(--accent))}
+.bg-accent\/10{background-color:rgb(var(--accent) / 0.1)}
+.bg-accent\/20{background-color:rgb(var(--accent) / 0.2)}
+.border{border-width:1px}
+.border-t{border-top-width:1px}
+.border-b{border-bottom-width:1px}
+.border-line{border-color:rgb(var(--line))}
+.border-accent{border-color:rgb(var(--accent))}
+.rounded-md{border-radius:0.375rem}
+.rounded-lg{border-radius:0.5rem}
+.rounded-xl{border-radius:0.75rem}
+.rounded-full{border-radius:9999px}
+.flex{display:flex}
+.inline-flex{display:inline-flex}
+.grid{display:grid}
+.flex-col{flex-direction:column}
+.flex-wrap{flex-wrap:wrap}
+.items-center{align-items:center}
+.items-start{align-items:flex-start}
+.items-end{align-items:flex-end}
+.items-baseline{align-items:baseline}
+.justify-between{justify-content:space-between}
+.justify-center{justify-content:center}
+.justify-end{justify-content:flex-end}
+.grow{flex-grow:1}
+.shrink-0{flex-shrink:0}
+.self-start{align-self:flex-start}
+.grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid-cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.col-span-2{grid-column:span 2 / span 2}
+.min-w-0{min-width:0}
+.overflow-hidden{overflow:hidden}
+.opacity-60{opacity:0.6}
+.ml-auto{margin-left:auto}
+.p-0{padding:0}
+.px-0{padding-left:0;padding-right:0}
+.py-0{padding-top:0;padding-bottom:0}
+.mt-0{margin-top:0}
+.mb-0{margin-bottom:0}
+.gap-1{gap:0.25rem}
+.p-1{padding:0.25rem}
+.px-1{padding-left:0.25rem;padding-right:0.25rem}
+.py-1{padding-top:0.25rem;padding-bottom:0.25rem}
+.mt-1{margin-top:0.25rem}
+.mb-1{margin-bottom:0.25rem}
+.gap-2{gap:0.5rem}
+.p-2{padding:0.5rem}
+.px-2{padding-left:0.5rem;padding-right:0.5rem}
+.py-2{padding-top:0.5rem;padding-bottom:0.5rem}
+.mt-2{margin-top:0.5rem}
+.mb-2{margin-bottom:0.5rem}
+.gap-3{gap:0.75rem}
+.p-3{padding:0.75rem}
+.px-3{padding-left:0.75rem;padding-right:0.75rem}
+.py-3{padding-top:0.75rem;padding-bottom:0.75rem}
+.mt-3{margin-top:0.75rem}
+.mb-3{margin-bottom:0.75rem}
+.gap-4{gap:1rem}
+.p-4{padding:1rem}
+.px-4{padding-left:1rem;padding-right:1rem}
+.py-4{padding-top:1rem;padding-bottom:1rem}
+.mt-4{margin-top:1rem}
+.mb-4{margin-bottom:1rem}
+.gap-6{gap:1.5rem}
+.p-6{padding:1.5rem}
+.px-6{padding-left:1.5rem;padding-right:1.5rem}
+.py-6{padding-top:1.5rem;padding-bottom:1.5rem}
+.mt-6{margin-top:1.5rem}
+.mb-6{margin-bottom:1.5rem}
+.gap-8{gap:2rem}
+.p-8{padding:2rem}
+.px-8{padding-left:2rem;padding-right:2rem}
+.py-8{padding-top:2rem;padding-bottom:2rem}
+.mt-8{margin-top:2rem}
+.mb-8{margin-bottom:2rem}
+.h-1{height:0.25rem}
+.w-1{width:0.25rem}
+.h-2{height:0.5rem}
+.w-2{width:0.5rem}
+.h-3{height:0.75rem}
+.w-3{width:0.75rem}
+.h-4{height:1rem}
+.w-4{width:1rem}
+.h-8{height:2rem}
+.w-8{width:2rem}
+.h-10{height:2.5rem}
+.w-10{width:2.5rem}
+.h-12{height:3rem}
+.w-12{width:3rem}
+.h-16{height:4rem}
+.w-16{width:4rem}
+.w-1\/4{width:25%}
+.w-1\/3{width:33.333333%}
+.w-1\/2{width:50%}
+.w-2\/3{width:66.666667%}
+.w-3\/4{width:75%}
+.w-full{width:100%}
+</style>
+</head>
+<body>
+<main class="sketch-screen">
+<header class="px-4 py-6 border-b border-line">
+  <h1 class="text-title font-bold text-fg">Page Turners</h1>
+  <p class="text-small text-muted mt-1">Your book club</p>
+</header>
+
+<section class="px-4 py-6">
+  <p class="section-label text-muted font-medium mb-3">This month's read</p>
+  <div class="card bg-raised rounded-lg p-4 border border-line">
+    <div class="flex gap-4">
+      <div class="bg-accent/10 rounded-md w-16 shrink-0"></div>
+      <div class="flex flex-col grow min-w-0">
+        <h2 class="text-heading font-semibold text-fg">The Midnight Library</h2>
+        <p class="text-body text-muted mt-1">Matt Haig</p>
+        <p class="text-small text-muted mt-3">Due: 31 Oct</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="px-4 py-6 border-t border-line">
+  <p class="section-label text-muted font-medium mb-3">Next meetup</p>
+  <div class="card bg-raised rounded-lg p-4 border border-line">
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <p class="text-small text-muted">hosting</p>
+        <p class="text-heading font-semibold text-fg mt-1">Member 2</p>
+      </div>
+      <div class="text-right">
+        <p class="text-small text-muted">thursday, 31 october</p>
+        <p class="text-heading font-semibold text-fg mt-1">7:00 pm</p>
+      </div>
+    </div>
+    <div class="bg-line rounded-full h-2 mt-4">
+      <div class="bg-accent rounded-full h-2 w-3/4"></div>
+    </div>
+    <p class="text-small text-accent font-semibold mt-2">26 days to go</p>
+  </div>
+</section>
+
+<section class="px-4 py-6 border-t border-line">
+  <p class="section-label text-muted font-medium mb-3">Suggestions</p>
+  <div class="list">
+    <div class="list-row bg-raised rounded-lg p-4 border border-line">
+      <div class="flex items-baseline justify-between">
+        <div class="grow">
+          <p class="text-body font-medium text-fg">Piranesi</p>
+          <p class="text-small text-muted mt-1">Suggested by You</p>
+        </div>
+      </div>
+    </div>
+    <div class="list-row bg-raised rounded-lg p-4 border border-line mt-2">
+      <div class="flex items-baseline justify-between">
+        <div class="grow">
+          <p class="text-body font-medium text-fg">Circe</p>
+          <p class="text-small text-muted mt-1">Suggested by Member 3</p>
+        </div>
+      </div>
+    </div>
+    <div class="list-row bg-raised rounded-lg p-4 border border-line mt-2">
+      <div class="flex items-baseline justify-between">
+        <div class="grow">
+          <p class="text-body font-medium text-fg">Project Hail Mary</p>
+          <p class="text-small text-muted mt-1">Suggested by Member 1</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="px-4 py-6 border-t border-line">
+  <button class="btn-primary w-full">Suggest a book</button>
+</section>
+</main>
+</body>
+</html>

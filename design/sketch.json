@@ -1,0 +1,38 @@
+{
+  "note": "The sketch this app's creator was shown when they made it (design/sketch.html). The first version keeps its layout, its words and its accent; any deviation is listed under Assumptions with the reason.",
+  "job": "See this month's book, who's hosting, and when you're meeting next",
+  "words": {
+    "the_book": "this month's read",
+    "the_host": "hosting",
+    "the_button": "suggest a book",
+    "the_meeting": "next meetup"
+  },
+  "accent": {
+    "dark": "#fbbf24",
+    "light": "#f59e0b"
+  },
+  "layout": [
+    "Header with title and subtitle",
+    "Current book card with cover placeholder and details",
+    "Host and meeting countdown section",
+    "Suggestions list showing recent proposals",
+    "Primary action button at bottom"
+  ],
+  "signature": "A countdown to the monthly meetup, phrased as the club would say it",
+  "accentName": "amber",
+  "primaryAction": "Suggest a book",
+  "tokens": {
+    "light": {
+      "accent": "149 96 7",
+      "on-accent": "255 255 255",
+      "focus": "149 96 7"
+    },
+    "dark": {
+      "accent": "251 191 36",
+      "on-accent": "28 25 23",
+      "focus": "251 191 36"
+    }
+  },
+  "model": "claude-haiku-4-5",
+  "createdAt": "2026-10-05T08:58:41.925Z"
+}
