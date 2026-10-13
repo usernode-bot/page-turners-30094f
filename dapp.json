@@ -11,5 +11,9 @@
     },
     { "name": "Suggestions list renders", "path": "/", "expectText": "Suggestions" },
     { "name": "Books read section renders", "path": "/", "expectText": "Books read" }
-  ]
+  ],
+  "icon": {
+    "image": "brand/icon.png",
+    "emoji": "📖"
+  }
 }
